@@ -3,7 +3,11 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_core.messages import ToolMessage , HumanMessage
+import json
+
+
 load_dotenv()
+
 
 
 SERVERS={
@@ -16,6 +20,10 @@ SERVERS={
             "run",
             "/Users/Lenovo/Desktop/MCP-Multi-Context-Protocol-/Math_MCP_Server/main.py"
         ]
+    },
+    'expense':{
+        "transport":"streamable_http",
+        "url":"https://test-antardhwani.fastmcp.app/mcp"
     }
 }
 
@@ -35,14 +43,15 @@ async def main():
     if not getattr(response ,"tool_calls",None):
         print("\n LLM : ",response.content)
         return 
+    tool_messages=[]
+    for tc in response.tool_calls:
+        selected_tool=tc[0]['name']
+        selected_tool_args=tc.get('args') or {}
+        selected_tool_id=tc[0]['id']
 
-    selected_tool=response.tool_calls[0]['name']
-    selected_tool_args=response.tool_calls[0]['args']
-    selected_tool_id=response.tool_calls[0]['id']
+        tool_result=await named_tools[selected_tool].ainvoke(selected_tool_args)
 
-    tool_result=await named_tools[selected_tool].ainvoke(selected_tool_args)
-
-    tool_message=ToolMessage(content=tool_result , tool_call_id=selected_tool_id)
+        tool_messages.append(ToolMessage(tool_call_id=selected_tool_id, content=json.dumps(result)))
 
     final_response=await llm_with_tools.ainvoke([prompt,response , tool_message])
     print(f"Final Response:,{final_response.content}")
